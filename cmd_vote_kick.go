@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -106,7 +107,7 @@ func (b *bot) handleMessagePollVote(kind string, session *discordgo.Session, gui
 	}
 
 	allowedVoterRoleID := strconv.FormatUint(b.cfg.VoteKick.AllowedVoterRole, 10)
-	voterAllowed := hasRole(member.Roles, allowedVoterRoleID)
+	voterAllowed := slices.Contains(member.Roles, allowedVoterRoleID)
 
 	yesVotes, err := session.PollAnswerVoters(channelID, messageID, yesAnswerID)
 	if err != nil {
@@ -120,7 +121,7 @@ func (b *bot) handleMessagePollVote(kind string, session *discordgo.Session, gui
 			return err
 		}
 
-		if hasRole(voterMember.Roles, allowedVoterRoleID) {
+		if slices.Contains(voterMember.Roles, allowedVoterRoleID) {
 			allowedYesVotes++
 		}
 	}
@@ -197,14 +198,4 @@ func voteKickYesAnswerID(msg *discordgo.Message) (int, bool) {
 	}
 
 	return 0, false
-}
-
-func hasRole(roleIDs []string, wantedRoleID string) bool {
-	for _, roleID := range roleIDs {
-		if roleID == wantedRoleID {
-			return true
-		}
-	}
-
-	return false
 }

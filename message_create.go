@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"log/slog"
+	"slices"
 	"strconv"
 
 	"github.com/bwmarrin/discordgo"
@@ -72,10 +73,8 @@ func (b *bot) requireRole(roleID uint64, handler commandHandler) commandHandler 
 			return errors.New("this command may only be used in a guild")
 		}
 
-		for _, roleID := range event.Member.Roles {
-			if roleID == requiredRoleID {
-				return handler(session, event, command)
-			}
+		if slices.Contains(event.Member.Roles, requiredRoleID) {
+			return handler(session, event, command)
 		}
 
 		return errors.New("you do not have the required role for this command")
