@@ -10,17 +10,7 @@ import (
 )
 
 const voteKickPollDurationHours = 24
-
-type voteKickPoll struct {
-	GuildID          string
-	ChannelID        string
-	TargetUserID     string
-	InitiatorUserID  string
-	AllowedVoterRole string
-	Threshold        int
-	YesAnswerID      int
-	NoAnswerID       int
-}
+const voteKickQuestionPrefix = "vote-kick target="
 
 func (b *bot) handleVoteKickCommand(session *discordgo.Session, event *discordgo.MessageCreate, command *ParsedCommand) error {
 	if event.GuildID == "" {
@@ -42,7 +32,7 @@ func (b *bot) handleVoteKickCommand(session *discordgo.Session, event *discordgo
 			Reference: event.Reference(),
 			Poll: &discordgo.Poll{
 				Question: discordgo.PollMedia{
-					Text: "Kick user " + targetUserID + "?",
+					Text: voteKickQuestionPrefix + targetUserID,
 				},
 				Answers: []discordgo.PollAnswer{
 					{Media: &discordgo.PollMedia{Text: "Yes"}},
@@ -61,27 +51,9 @@ func (b *bot) handleVoteKickCommand(session *discordgo.Session, event *discordgo
 		"vote-kick poll created",
 		"poll_message_id", msg.ID,
 		"channel_id", msg.ChannelID,
-		"guild_id", msg.GuildID,
+		"guild_id", event.GuildID,
 		"target_user_id", targetUserID,
 	)
-
-	pollState := &voteKickPoll{
-		GuildID:          event.GuildID,
-		ChannelID:        event.ChannelID,
-		TargetUserID:     targetUserID,
-		InitiatorUserID:  event.Author.ID,
-		AllowedVoterRole: strconv.FormatUint(b.cfg.VoteKick.AllowedVoterRole, 10),
-		Threshold:        b.cfg.VoteKick.Threshold,
-	}
-
-	if msg.Poll != nil && len(msg.Poll.Answers) >= 2 {
-		pollState.YesAnswerID = msg.Poll.Answers[0].AnswerID
-		pollState.NoAnswerID = msg.Poll.Answers[1].AnswerID
-	}
-
-	b.voteKickMu.Lock()
-	b.voteKickPolls[msg.ID] = pollState
-	b.voteKickMu.Unlock()
 
 	return nil
 }
@@ -113,11 +85,19 @@ func (b *bot) handleMessagePollVoteRemove(session *discordgo.Session, event *dis
 }
 
 func (b *bot) handleMessagePollVote(kind string, session *discordgo.Session, guildID string, channelID string, messageID string, userID string, answerID int) error {
-	b.voteKickMu.Lock()
-	pollState, ok := b.voteKickPolls[messageID]
-	b.voteKickMu.Unlock()
+	msg, err := session.ChannelMessage(channelID, messageID)
+	if err != nil {
+		return err
+	}
+
+	targetUserID, ok := voteKickTargetUserID(msg)
 	if !ok {
 		return nil
+	}
+
+	yesAnswerID, ok := voteKickYesAnswerID(msg)
+	if !ok {
+		return errors.New("vote-kick poll does not have a Yes answer")
 	}
 
 	member, err := session.GuildMember(guildID, userID)
@@ -125,15 +105,10 @@ func (b *bot) handleMessagePollVote(kind string, session *discordgo.Session, gui
 		return err
 	}
 
-	voterAllowed := false
-	for _, roleID := range member.Roles {
-		if roleID == pollState.AllowedVoterRole {
-			voterAllowed = true
-			break
-		}
-	}
+	allowedVoterRoleID := strconv.FormatUint(b.cfg.VoteKick.AllowedVoterRole, 10)
+	voterAllowed := hasRole(member.Roles, allowedVoterRoleID)
 
-	yesVotes, err := session.PollAnswerVoters(channelID, messageID, pollState.YesAnswerID)
+	yesVotes, err := session.PollAnswerVoters(channelID, messageID, yesAnswerID)
 	if err != nil {
 		return err
 	}
@@ -145,11 +120,8 @@ func (b *bot) handleMessagePollVote(kind string, session *discordgo.Session, gui
 			return err
 		}
 
-		for _, roleID := range voterMember.Roles {
-			if roleID == pollState.AllowedVoterRole {
-				allowedYesVotes++
-				break
-			}
+		if hasRole(voterMember.Roles, allowedVoterRoleID) {
+			allowedYesVotes++
 		}
 	}
 
@@ -159,15 +131,80 @@ func (b *bot) handleMessagePollVote(kind string, session *discordgo.Session, gui
 		"poll_message_id", messageID,
 		"channel_id", channelID,
 		"guild_id", guildID,
-		"target_user_id", pollState.TargetUserID,
-		"initiator_user_id", pollState.InitiatorUserID,
+		"target_user_id", targetUserID,
 		"voter_user_id", userID,
 		"voter_allowed", voterAllowed,
 		"answer_id", answerID,
-		"yes_answer_id", pollState.YesAnswerID,
+		"yes_answer_id", yesAnswerID,
 		"allowed_yes_votes", allowedYesVotes,
-		"threshold", pollState.Threshold,
+		"threshold", b.cfg.VoteKick.Threshold,
+	)
+
+	if allowedYesVotes < b.cfg.VoteKick.Threshold {
+		return nil
+	}
+
+	_, err = session.PollExpire(channelID, messageID)
+	if err != nil {
+		return err
+	}
+
+	err = session.GuildMemberDeleteWithReason(guildID, targetUserID, "vote-kick threshold reached")
+	if err != nil {
+		return err
+	}
+
+	slog.Info(
+		"vote-kick executed",
+		"poll_message_id", messageID,
+		"channel_id", channelID,
+		"guild_id", guildID,
+		"target_user_id", targetUserID,
+		"allowed_yes_votes", allowedYesVotes,
+		"threshold", b.cfg.VoteKick.Threshold,
 	)
 
 	return nil
+}
+
+func voteKickTargetUserID(msg *discordgo.Message) (string, bool) {
+	if msg.Poll == nil {
+		return "", false
+	}
+
+	text := msg.Poll.Question.Text
+	if !strings.HasPrefix(text, voteKickQuestionPrefix) {
+		return "", false
+	}
+
+	targetUserID := strings.TrimPrefix(text, voteKickQuestionPrefix)
+	if targetUserID == "" {
+		return "", false
+	}
+
+	return targetUserID, true
+}
+
+func voteKickYesAnswerID(msg *discordgo.Message) (int, bool) {
+	if msg.Poll == nil {
+		return 0, false
+	}
+
+	for _, answer := range msg.Poll.Answers {
+		if answer.Media != nil && answer.Media.Text == "Yes" {
+			return answer.AnswerID, true
+		}
+	}
+
+	return 0, false
+}
+
+func hasRole(roleIDs []string, wantedRoleID string) bool {
+	for _, roleID := range roleIDs {
+		if roleID == wantedRoleID {
+			return true
+		}
+	}
+
+	return false
 }

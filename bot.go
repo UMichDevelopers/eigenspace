@@ -1,17 +1,12 @@
 package main
 
 import (
-	"sync"
-
 	"github.com/bwmarrin/discordgo"
 )
 
 type bot struct {
 	session *discordgo.Session
 	cfg     *Config
-
-	voteKickMu    sync.Mutex
-	voteKickPolls map[string]*voteKickPoll
 }
 
 func newBot(cfg *Config) (*bot, error) {
@@ -26,9 +21,8 @@ func newBot(cfg *Config) (*bot, error) {
 		discordgo.IntentMessageContent
 
 	bot := &bot{
-		session:       session,
-		cfg:           cfg,
-		voteKickPolls: make(map[string]*voteKickPoll),
+		session: session,
+		cfg:     cfg,
 	}
 	session.AddHandler(eventMiddleware("connect", bot.handleConnect))
 	session.AddHandler(eventMiddleware("disconnect", bot.handleDisconnect))
