@@ -3,10 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func run() error {
@@ -29,22 +31,28 @@ func run() error {
 	}
 	defer func() {
 		if err := bot.Close(); err != nil {
-			log.Printf("close discord session: %v", err)
+			slog.Error("close discord session", "err", err)
 		}
 	}()
 
-	log.Printf("discord bot is running")
+	slog.Info("discord bot is running")
 
 	sigch := make(chan os.Signal, 1)
 	signal.Notify(sigch, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(sigch)
 
-	<-sigch
+	sig := <-sigch
+	slog.Info("shutdown signal received", "signal", sig.String())
 	return nil
 }
 
 func main() {
+	spew.Config.Indent = " "
+	spew.Config.SortKeys = true
+	spew.Config.DisableCapacities = true
+
 	if err := run(); err != nil {
-		log.Fatal(err)
+		slog.Error("bot exited with error", "err", err)
+		os.Exit(1)
 	}
 }

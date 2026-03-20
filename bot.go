@@ -19,7 +19,10 @@ func newBot(cfg *Config) (*bot, error) {
 		discordgo.IntentMessageContent
 
 	bot := &bot{session: session}
-	session.AddHandler(bot.handleMessageCreate)
+	session.AddHandler(eventMiddleware("connect", bot.handleConnect))
+	session.AddHandler(eventMiddleware("disconnect", bot.handleDisconnect))
+	session.AddHandler(eventMiddleware("ready", bot.handleReady))
+	session.AddHandler(eventMiddleware("message_create", bot.handleMessageCreate))
 	return bot, nil
 }
 

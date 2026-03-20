@@ -1,25 +1,41 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 
 	"github.com/bwmarrin/discordgo"
 )
 
-func (b *bot) handleMessageCreate(session *discordgo.Session, event *discordgo.MessageCreate) {
+type commandHandler func(*discordgo.Session, *discordgo.MessageCreate, *ParsedCommand) error
+
+func (b *bot) handleMessageCreate(session *discordgo.Session, event *discordgo.MessageCreate) error {
 	if event.Author == nil || event.Author.Bot {
-		return
+		return nil
 	}
 
 	command, ok := parseCommand(event.Content)
 	if !ok {
-		return
+		return nil
 	}
 
-	switch command.Command {
-	case "PING":
-		if _, err := session.ChannelMessageSend(event.ChannelID, "PONG"); err != nil {
-			log.Printf("send message to channel %s: %v", event.ChannelID, err)
-		}
+	slog.Info(
+		"discord command parsed",
+		"channel_id", event.ChannelID,
+		"guild_id", event.GuildID,
+		"message_id", event.ID,
+		"author_id", event.Author.ID,
+		"command", command.Command,
+		"arg_count", len(command.Args),
+	)
+
+	handlers := map[string]commandHandler{
+		"PING": b.handlePingCommand,
 	}
+
+	handler, ok := handlers[command.Command]
+	if !ok {
+		return nil
+	}
+
+	return handler(session, event, command)
 }
