@@ -11,20 +11,26 @@ import (
 )
 
 const voteKickPollDurationHours = 24
-const voteKickQuestionPrefix = "vote-kick target="
+const voteKickQuestionPrefix = "[vote-kick target="
+const voteKickQuestionSuffix = "] "
 
 func (b *bot) handleVoteKickCommand(session *discordgo.Session, event *discordgo.MessageCreate, command *ParsedCommand) error {
 	if event.GuildID == "" {
 		return errors.New("this command may only be used in a guild")
 	}
 
-	if len(command.Args) != 1 {
-		return errors.New("usage: %vote-kick <user-id-or-mention>")
+	if len(command.Args) < 1 || len(command.Args) > 2 {
+		return errors.New("usage: %vote-kick <user-id-or-mention> [:reason]")
 	}
 
 	targetUserID, err := normalizeUserID(command.Args[0])
 	if err != nil {
 		return err
+	}
+
+	reason := ""
+	if len(command.Args) == 2 {
+		reason = strings.TrimSpace(command.Args[1])
 	}
 
 	msg, err := session.ChannelMessageSendComplex(
@@ -33,7 +39,7 @@ func (b *bot) handleVoteKickCommand(session *discordgo.Session, event *discordgo
 			Reference: event.Reference(),
 			Poll: &discordgo.Poll{
 				Question: discordgo.PollMedia{
-					Text: voteKickQuestionPrefix + targetUserID,
+					Text: voteKickQuestion(targetUserID, reason),
 				},
 				Answers: []discordgo.PollAnswer{
 					{Media: &discordgo.PollMedia{Text: "Yes"}},
@@ -101,6 +107,11 @@ func (b *bot) handleMessagePollVote(kind string, session *discordgo.Session, gui
 		return errors.New("vote-kick poll does not have a Yes answer")
 	}
 
+	noAnswerID, ok := voteKickNoAnswerID(msg)
+	if !ok {
+		return errors.New("vote-kick poll does not have a No answer")
+	}
+
 	member, err := session.GuildMember(guildID, userID)
 	if err != nil {
 		return err
@@ -110,6 +121,11 @@ func (b *bot) handleMessagePollVote(kind string, session *discordgo.Session, gui
 	voterAllowed := slices.Contains(member.Roles, allowedVoterRoleID)
 
 	yesVotes, err := session.PollAnswerVoters(channelID, messageID, yesAnswerID)
+	if err != nil {
+		return err
+	}
+
+	noVotes, err := session.PollAnswerVoters(channelID, messageID, noAnswerID)
 	if err != nil {
 		return err
 	}
@@ -126,6 +142,20 @@ func (b *bot) handleMessagePollVote(kind string, session *discordgo.Session, gui
 		}
 	}
 
+	allowedNoVotes := 0
+	for _, voter := range noVotes {
+		voterMember, err := session.GuildMember(guildID, voter.ID)
+		if err != nil {
+			return err
+		}
+
+		if slices.Contains(voterMember.Roles, allowedVoterRoleID) {
+			allowedNoVotes++
+		}
+	}
+
+	score := allowedYesVotes - allowedNoVotes
+
 	slog.Info(
 		"vote-kick poll vote observed",
 		"kind", kind,
@@ -137,11 +167,14 @@ func (b *bot) handleMessagePollVote(kind string, session *discordgo.Session, gui
 		"voter_allowed", voterAllowed,
 		"answer_id", answerID,
 		"yes_answer_id", yesAnswerID,
+		"no_answer_id", noAnswerID,
 		"allowed_yes_votes", allowedYesVotes,
+		"allowed_no_votes", allowedNoVotes,
+		"score", score,
 		"threshold", b.cfg.VoteKick.Threshold,
 	)
 
-	if allowedYesVotes < b.cfg.VoteKick.Threshold {
+	if score < b.cfg.VoteKick.Threshold {
 		return nil
 	}
 
@@ -162,6 +195,8 @@ func (b *bot) handleMessagePollVote(kind string, session *discordgo.Session, gui
 		"guild_id", guildID,
 		"target_user_id", targetUserID,
 		"allowed_yes_votes", allowedYesVotes,
+		"allowed_no_votes", allowedNoVotes,
+		"score", score,
 		"threshold", b.cfg.VoteKick.Threshold,
 	)
 
@@ -178,8 +213,9 @@ func voteKickTargetUserID(msg *discordgo.Message) (string, bool) {
 		return "", false
 	}
 
-	targetUserID := strings.TrimPrefix(text, voteKickQuestionPrefix)
-	if targetUserID == "" {
+	rest := strings.TrimPrefix(text, voteKickQuestionPrefix)
+	targetUserID, _, ok := strings.Cut(rest, voteKickQuestionSuffix)
+	if !ok || targetUserID == "" {
 		return "", false
 	}
 
@@ -198,4 +234,27 @@ func voteKickYesAnswerID(msg *discordgo.Message) (int, bool) {
 	}
 
 	return 0, false
+}
+
+func voteKickNoAnswerID(msg *discordgo.Message) (int, bool) {
+	if msg.Poll == nil {
+		return 0, false
+	}
+
+	for _, answer := range msg.Poll.Answers {
+		if answer.Media != nil && answer.Media.Text == "No" {
+			return answer.AnswerID, true
+		}
+	}
+
+	return 0, false
+}
+
+func voteKickQuestion(targetUserID string, reason string) string {
+	text := voteKickQuestionPrefix + targetUserID + voteKickQuestionSuffix + "Kick <@" + targetUserID + ">?"
+	if reason != "" {
+		text += " Reason: " + reason
+	}
+
+	return text
 }
