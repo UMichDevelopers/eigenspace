@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log/slog"
 
 	"github.com/bwmarrin/discordgo"
@@ -38,5 +39,15 @@ func (b *bot) handleMessageCreate(session *discordgo.Session, event *discordgo.M
 		return nil
 	}
 
-	return handler(session, event, command)
+	err := handler(session, event, command)
+	if err == nil {
+		return nil
+	}
+
+	replyErr := reply(session, event, err.Error())
+	if replyErr != nil {
+		return errors.Join(err, replyErr)
+	}
+
+	return err
 }

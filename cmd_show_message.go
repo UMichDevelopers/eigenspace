@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log/slog"
 
 	"github.com/bwmarrin/discordgo"
@@ -19,11 +20,7 @@ func (b *bot) handleShowMessageCommand(session *discordgo.Session, event *discor
 		channelID = command.Args[0]
 		messageID = command.Args[1]
 	default:
-		_, err := session.ChannelMessageSend(
-			event.ChannelID,
-			"usage: %show-message [channel-id] <message-id>",
-		)
-		return err
+		return errors.New("usage: %show-message [channel-id] <message-id>")
 	}
 
 	message, err := session.ChannelMessage(channelID, messageID)
@@ -41,8 +38,9 @@ func (b *bot) handleShowMessageCommand(session *discordgo.Session, event *discor
 		"data", spew.Sdump(message),
 	)
 
-	_, err = session.ChannelMessageSend(
-		event.ChannelID,
+	err = reply(
+		session,
+		event,
 		"logged details for message "+messageID+" in channel "+channelID,
 	)
 	return err
