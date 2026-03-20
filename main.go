@@ -50,6 +50,7 @@ func main() {
 	spew.Config.Indent = "\t"
 	spew.Config.SortKeys = true
 	spew.Config.DisableCapacities = true
+	spew.Config.DisablePointerAddresses = true
 
 	if err := run(); err != nil {
 		slog.Error("bot exited with error", "err", err)
