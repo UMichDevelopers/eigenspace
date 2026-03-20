@@ -6,6 +6,7 @@ import (
 
 type bot struct {
 	session *discordgo.Session
+	cfg     *Config
 }
 
 func newBot(cfg *Config) (*bot, error) {
@@ -18,7 +19,10 @@ func newBot(cfg *Config) (*bot, error) {
 		discordgo.IntentDirectMessages |
 		discordgo.IntentMessageContent
 
-	bot := &bot{session: session}
+	bot := &bot{
+		session: session,
+		cfg:     cfg,
+	}
 	session.AddHandler(eventMiddleware("connect", bot.handleConnect))
 	session.AddHandler(eventMiddleware("disconnect", bot.handleDisconnect))
 	session.AddHandler(eventMiddleware("ready", bot.handleReady))

@@ -8,7 +8,8 @@ import (
 
 type Config struct {
 	Discord struct {
-		Token string `scfgs:"token"`
+		Token       string `scfgs:"token"`
+		AdminRoleID uint64 `scfgs:"admin_role_id"`
 	} `scfgs:"discord"`
 }
 
