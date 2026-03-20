@@ -30,8 +30,9 @@ func (b *bot) handleMessageCreate(session *discordgo.Session, event *discordgo.M
 	)
 
 	handlers := map[string]commandHandler{
-		"PING":         b.handlePingCommand,
-		"SHOW-MESSAGE": b.handleShowMessageCommand,
+		"PING":                 b.handlePingCommand,
+		"SHOW-MESSAGE":         b.handleShowMessageCommand,
+		"SHOW-MESSAGE-CONTENT": b.handleShowMessageContentCommand,
 	}
 
 	handler, ok := handlers[command.Command]
