@@ -12,9 +12,9 @@ import (
 
 const voteKickPollDurationHours = 24
 const voteKickQuestionPrefix = "Kick "
-const voteKickQuestionNameSep = " \""
-const voteKickQuestionForSep = "\" for \""
-const voteKickQuestionQuestionSuffix = "\"?"
+const voteKickQuestionNameSep = " “"
+const voteKickQuestionForSep = "” for “"
+const voteKickQuestionQuestionSuffix = "”?"
 
 func (b *bot) handleVoteKickCommand(session *discordgo.Session, event *discordgo.MessageCreate, command *ParsedCommand) error {
 	if event.GuildID == "" {
