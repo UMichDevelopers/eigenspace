@@ -11,8 +11,10 @@ import (
 )
 
 const voteKickPollDurationHours = 24
-const voteKickQuestionPrefix = "[vote-kick target="
-const voteKickQuestionSuffix = "]"
+const voteKickQuestionPrefix = "Kick "
+const voteKickQuestionNameSep = " \""
+const voteKickQuestionForSep = "\" for \""
+const voteKickQuestionQuestionSuffix = "\"?"
 
 func (b *bot) handleVoteKickCommand(session *discordgo.Session, event *discordgo.MessageCreate, command *ParsedCommand) error {
 	if event.GuildID == "" {
@@ -214,21 +216,17 @@ func voteKickTargetUserID(msg *discordgo.Message) (string, bool) {
 	}
 
 	text := msg.Poll.Question.Text
-	for _, line := range strings.Split(text, "\n") {
-		if !strings.HasPrefix(line, voteKickQuestionPrefix) {
-			continue
-		}
-
-		rest := strings.TrimPrefix(line, voteKickQuestionPrefix)
-		targetUserID, ok := strings.CutSuffix(rest, voteKickQuestionSuffix)
-		if !ok || targetUserID == "" {
-			return "", false
-		}
-
-		return targetUserID, true
+	if !strings.HasPrefix(text, voteKickQuestionPrefix) {
+		return "", false
 	}
 
-	return "", false
+	rest := strings.TrimPrefix(text, voteKickQuestionPrefix)
+	targetUserID, _, ok := strings.Cut(rest, voteKickQuestionNameSep)
+	if !ok || targetUserID == "" {
+		return "", false
+	}
+
+	return targetUserID, true
 }
 
 func voteKickYesAnswerID(msg *discordgo.Message) (int, bool) {
@@ -260,12 +258,12 @@ func voteKickNoAnswerID(msg *discordgo.Message) (int, bool) {
 }
 
 func voteKickQuestion(targetUserID string, targetDisplayName string, reason string) string {
-	text := "Kick " + targetDisplayName + "?\n" + voteKickQuestionPrefix + targetUserID + voteKickQuestionSuffix
+	text := voteKickQuestionPrefix + targetUserID + voteKickQuestionNameSep + targetDisplayName
 	if reason != "" {
-		text += "\nReason: " + reason
+		return text + voteKickQuestionForSep + reason + voteKickQuestionQuestionSuffix
 	}
 
-	return text
+	return text + voteKickQuestionQuestionSuffix
 }
 
 func resolveVoteKickTargetDisplayName(session *discordgo.Session, guildID string, targetUserID string) (string, error) {
