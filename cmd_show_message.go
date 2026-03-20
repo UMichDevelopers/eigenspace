@@ -43,7 +43,7 @@ func (b *bot) handleShowMessageCommand(session *discordgo.Session, event *discor
 	err = replyFile(
 		session,
 		event,
-		"message "+messageID+" from channel "+channelID,
+		"",
 		"message-"+messageID+".txt",
 		strings.NewReader(dump),
 	)
