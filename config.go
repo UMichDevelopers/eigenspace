@@ -11,6 +11,11 @@ type Config struct {
 		Token       string `scfgs:"token"`
 		AdminRoleID uint64 `scfgs:"admin_role_id"`
 	} `scfgs:"discord"`
+
+	VoteKick struct {
+		AllowedVoterRole uint64 `scfgs:"allowed_voter_role"`
+		Threshold        int    `scfgs:"threshold"`
+	} `scfgs:"vote_kick"`
 }
 
 func loadConfig(path string) (*Config, error) {

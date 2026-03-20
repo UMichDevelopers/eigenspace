@@ -40,6 +40,10 @@ func (b *bot) handleMessageCreate(session *discordgo.Session, event *discordgo.M
 			b.cfg.Discord.AdminRoleID,
 			b.handleShowMessageContentCommand,
 		),
+		"VOTE-KICK": b.requireRole(
+			b.cfg.VoteKick.AllowedVoterRole,
+			b.handleVoteKickCommand,
+		),
 	}
 
 	handler, ok := handlers[command.Command]
