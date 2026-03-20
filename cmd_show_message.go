@@ -45,16 +45,7 @@ func (b *bot) handleShowMessageCommand(session *discordgo.Session, event *discor
 		event,
 		"message "+messageID+" from channel "+channelID,
 		"message-"+messageID+".txt",
-		strings.NewReader(indentCodeBlock(dump)),
+		strings.NewReader(dump),
 	)
 	return err
-}
-
-func indentCodeBlock(s string) string {
-	lines := strings.Split(s, "\n")
-	for i, line := range lines {
-		lines[i] = "    " + line
-	}
-
-	return strings.Join(lines, "\n")
 }
