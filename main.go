@@ -47,7 +47,7 @@ func run() error {
 }
 
 func main() {
-	spew.Config.Indent = " "
+	spew.Config.Indent = "\t"
 	spew.Config.SortKeys = true
 	spew.Config.DisableCapacities = true
 
