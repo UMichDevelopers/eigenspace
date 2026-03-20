@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"log/slog"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/davecgh/go-spew/spew"
@@ -38,10 +39,20 @@ func (b *bot) handleShowMessageCommand(session *discordgo.Session, event *discor
 		"data", spew.Sdump(message),
 	)
 
+	dump := spew.Sdump(message)
 	err = reply(
 		session,
 		event,
-		"logged details for message "+messageID+" in channel "+channelID,
+		"message "+messageID+" from channel "+channelID+":\n\n"+indentCodeBlock(dump),
 	)
 	return err
+}
+
+func indentCodeBlock(s string) string {
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		lines[i] = "    " + line
+	}
+
+	return strings.Join(lines, "\n")
 }
