@@ -1,0 +1,33 @@
+version: "2"
+
+linters:
+  default: all
+  disable:
+    - depguard         # doesn't make sense for us
+    - dupword          # extremely normal in tests and a pretty unnecessary linter
+    - ireturn          # can't seem to ignore this linter properly and we don't need anyway, cf. tagged unions
+    - goconst          # unnecessary especially for our parsing code; many false positives
+    - mnd              # unnecessary especially for our parsing code; many false positives
+    - lll              # common sense is much better than these sort of rules
+    - gosmopolitan     # completely normal to have CJK and such in tests
+    - nonamedreturns   # named returns are often good for clarity
+    - wsl              # outdated, use wsl_v5 instead
+    - varnamelen       # it's rather reasonable to have counters like i, even when it spans quite a bit
+    - gocyclo          # cyclomatic metrics aren't that good
+    - cyclop           # cyclomatic metrics aren't that good
+    - godox            # TODO/etc comments are allowed in our codebase
+    - funlen           # long functions are fine
+    - wrapcheck        # rules around interface-return methods are a bit silly
+
+    - exhaustruct      # tmp: should fix... but too annoying at the moment
+    - err113           # tmp: will enable when we properly use defined errors
+    - gocognit         # tmp: should consider sometime
+
+  settings:
+    perfsprint:
+      errorf: false
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
