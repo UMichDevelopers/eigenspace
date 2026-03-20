@@ -12,7 +12,7 @@ import (
 
 const voteKickPollDurationHours = 24
 const voteKickQuestionPrefix = "[vote-kick target="
-const voteKickQuestionSuffix = "] "
+const voteKickQuestionSuffix = "]"
 
 func (b *bot) handleVoteKickCommand(session *discordgo.Session, event *discordgo.MessageCreate, command *ParsedCommand) error {
 	if event.GuildID == "" {
@@ -28,6 +28,11 @@ func (b *bot) handleVoteKickCommand(session *discordgo.Session, event *discordgo
 		return err
 	}
 
+	targetDisplayName, err := resolveVoteKickTargetDisplayName(session, event.GuildID, targetUserID)
+	if err != nil {
+		return err
+	}
+
 	reason := ""
 	if len(command.Args) == 2 {
 		reason = strings.TrimSpace(command.Args[1])
@@ -39,7 +44,7 @@ func (b *bot) handleVoteKickCommand(session *discordgo.Session, event *discordgo
 			Reference: event.Reference(),
 			Poll: &discordgo.Poll{
 				Question: discordgo.PollMedia{
-					Text: voteKickQuestion(targetUserID, reason),
+					Text: voteKickQuestion(targetUserID, targetDisplayName, reason),
 				},
 				Answers: []discordgo.PollAnswer{
 					{Media: &discordgo.PollMedia{Text: "Yes"}},
@@ -209,17 +214,21 @@ func voteKickTargetUserID(msg *discordgo.Message) (string, bool) {
 	}
 
 	text := msg.Poll.Question.Text
-	if !strings.HasPrefix(text, voteKickQuestionPrefix) {
-		return "", false
+	for _, line := range strings.Split(text, "\n") {
+		if !strings.HasPrefix(line, voteKickQuestionPrefix) {
+			continue
+		}
+
+		rest := strings.TrimPrefix(line, voteKickQuestionPrefix)
+		targetUserID, ok := strings.CutSuffix(rest, voteKickQuestionSuffix)
+		if !ok || targetUserID == "" {
+			return "", false
+		}
+
+		return targetUserID, true
 	}
 
-	rest := strings.TrimPrefix(text, voteKickQuestionPrefix)
-	targetUserID, _, ok := strings.Cut(rest, voteKickQuestionSuffix)
-	if !ok || targetUserID == "" {
-		return "", false
-	}
-
-	return targetUserID, true
+	return "", false
 }
 
 func voteKickYesAnswerID(msg *discordgo.Message) (int, bool) {
@@ -250,11 +259,25 @@ func voteKickNoAnswerID(msg *discordgo.Message) (int, bool) {
 	return 0, false
 }
 
-func voteKickQuestion(targetUserID string, reason string) string {
-	text := voteKickQuestionPrefix + targetUserID + voteKickQuestionSuffix + "Kick <@" + targetUserID + ">?"
+func voteKickQuestion(targetUserID string, targetDisplayName string, reason string) string {
+	text := "Kick " + targetDisplayName + "?\n" + voteKickQuestionPrefix + targetUserID + voteKickQuestionSuffix
 	if reason != "" {
-		text += " Reason: " + reason
+		text += "\nReason: " + reason
 	}
 
 	return text
+}
+
+func resolveVoteKickTargetDisplayName(session *discordgo.Session, guildID string, targetUserID string) (string, error) {
+	member, err := session.GuildMember(guildID, targetUserID)
+	if err == nil {
+		return member.DisplayName(), nil
+	}
+
+	user, err := session.User(targetUserID)
+	if err != nil {
+		return "", err
+	}
+
+	return user.DisplayName(), nil
 }
