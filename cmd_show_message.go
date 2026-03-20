@@ -40,10 +40,12 @@ func (b *bot) handleShowMessageCommand(session *discordgo.Session, event *discor
 	)
 
 	dump := spew.Sdump(message)
-	err = reply(
+	err = replyFile(
 		session,
 		event,
-		"message "+messageID+" from channel "+channelID+":\n\n"+indentCodeBlock(dump),
+		"message "+messageID+" from channel "+channelID,
+		"message-"+messageID+".txt",
+		strings.NewReader(indentCodeBlock(dump)),
 	)
 	return err
 }
