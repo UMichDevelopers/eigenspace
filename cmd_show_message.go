@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log/slog"
 	"strings"
 
@@ -9,7 +10,11 @@ import (
 )
 
 func (b *bot) handleShowMessageCommand(session *discordgo.Session, event *discordgo.MessageCreate, command *ParsedCommand) error {
-	channelID, messageID, err := resolveShowMessageTarget(event, command, "usage: %show-message [channel-id] <message-id>")
+	if len(command.Args) != 1 {
+		return errors.New("usage: %show-message <discord-message-url>")
+	}
+
+	channelID, messageID, err := parseDiscordMessageURL(command.Args[0], "usage: %show-message <discord-message-url>")
 	if err != nil {
 		return err
 	}

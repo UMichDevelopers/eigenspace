@@ -1,13 +1,18 @@
 package main
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
 )
 
 func (b *bot) handleShowMessageContentCommand(session *discordgo.Session, event *discordgo.MessageCreate, command *ParsedCommand) error {
-	channelID, messageID, err := resolveShowMessageTarget(event, command, "usage: %show-message-content [channel-id] <message-id>")
+	if len(command.Args) != 1 {
+		return errors.New("usage: %show-message-content <discord-message-url>")
+	}
+
+	channelID, messageID, err := parseDiscordMessageURL(command.Args[0], "usage: %show-message-content <discord-message-url>")
 	if err != nil {
 		return err
 	}
